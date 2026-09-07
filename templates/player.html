@@ -10,6 +10,8 @@
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/images/app_icon.png">
     <link rel="stylesheet" href="/static/css/style.css?v=2">
 </head>
 <body class="bg-slate-950 text-white min-h-screen flex flex-col overflow-hidden select-none font-sans relative">
@@ -21,8 +23,8 @@
     <!-- Top Navigation Bar -->
     <header class="relative z-40 flex items-center justify-between px-8 py-4 border-b border-slate-700/80 bg-slate-950/60 backdrop-blur-md">
         <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-pink-500 flex items-center justify-center shadow-lg shadow-pink-500/20">
-                <i data-lucide="disc-3" class="w-6 h-6 text-white animate-spin-slow"></i>
+            <div class="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-pink-500/30 border border-white/20">
+                <img src="/static/images/app_icon.png" alt="DuoJukebox" class="w-full h-full object-cover">
             </div>
             <div>
                 <h1 class="text-xl font-bold bg-gradient-to-r from-pink-400 to-indigo-300 bg-clip-text text-transparent">DuoJukebox</h1>
