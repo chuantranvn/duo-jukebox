@@ -150,6 +150,25 @@
                         <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pink-600 shadow-md"></div>
                     </label>
                 </div>
+
+                <!-- Radio Autoplay Toggle Card -->
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-800/70 border border-white/10 shadow-inner">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 border border-purple-500/30">
+                            <i data-lucide="radio" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-semibold text-white flex items-center space-x-1">
+                                <span>Chế độ Radio Tự Động 📻</span>
+                            </div>
+                            <p class="text-[10px] text-slate-300">Tự động nối bài tương tự khi hết queue</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="radio-mode-toggle" class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600 shadow-md"></div>
+                    </label>
+                </div>
             </div>
 
             <!-- Queue Items List Container Card -->
@@ -231,7 +250,12 @@
 
             <!-- Title & Requester -->
             <div class="flex-1 min-w-0">
-                <h4 id="mini-title" class="text-xs font-bold text-white truncate">Chưa phát bài nào</h4>
+                <div class="flex items-center space-x-2 truncate">
+                    <h4 id="mini-title" class="text-xs font-bold text-white truncate">Chưa phát bài nào</h4>
+                    <span id="mini-sound-wave" class="sound-wave-mini shrink-0 hidden">
+                        <span></span><span></span><span></span><span></span>
+                    </span>
+                </div>
                 <div class="flex items-center space-x-1.5 text-[10px] text-slate-400 truncate mt-0.5">
                     <span id="mini-artist" class="truncate">DuoJukebox</span>
                     <span>•</span>
@@ -288,9 +312,15 @@
 
         <!-- Song Title & Progress & Controls -->
         <div class="space-y-6 max-w-sm mx-auto w-full">
-            <div>
+            <div class="text-center">
                 <h3 id="modal-title" class="text-lg font-bold text-white text-center truncate">Tên bài hát</h3>
                 <p id="modal-artist" class="text-xs text-slate-400 text-center truncate mt-1">Ca sĩ / Kênh</p>
+                <div class="flex items-center justify-center space-x-2 mt-2">
+                    <span id="modal-sound-wave" class="sound-wave-mini shrink-0 hidden">
+                        <span></span><span></span><span></span><span></span>
+                    </span>
+                    <span id="modal-sound-wave-label" class="text-[10px] text-pink-400 font-bold uppercase tracking-wider hidden">Đang phát ra loa</span>
+                </div>
             </div>
 
             <!-- Progress Bar -->
@@ -392,7 +422,7 @@
 
     <!-- Identity & Custom Nickname Manager -->
     <script src="/static/js/identity.js?v=2"></script>
-    <script src="/static/js/remote.js?v=10"></script>
+    <script src="/static/js/remote.js?v=13"></script>
     <script>
         lucide.createIcons();
     </script>

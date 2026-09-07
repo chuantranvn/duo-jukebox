@@ -228,3 +228,46 @@ def _format_duration(seconds: int) -> str:
     if h > 0:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m}:{s:02d}"
+
+def get_radio_recommendations(current_song: dict = None, history_ids: list = None, limit: int = 6):
+    """
+    Finds a recommended next song for Radio Mode based on current_song.
+    Filters out any video IDs present in history_ids.
+    """
+    history_set = set(history_ids or [])
+    if current_song and current_song.get("id"):
+        history_set.add(current_song["id"])
+
+    query = ""
+    if current_song:
+        artist = current_song.get("artist", "").strip()
+        title = current_song.get("title", "").strip()
+        clean_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
+        
+        if artist and artist.lower() not in ["youtube", "unknown", "không rõ", ""]:
+            query = f"{artist} tuyển chọn"
+        elif clean_title:
+            query = f"{clean_title} tuyển chọn"
+            
+    if not query:
+        query = "nhạc acoustic chill tuyển chọn"
+
+    try:
+        results = search_youtube(query, limit=limit)
+        for item in results:
+            if item.get("id") and item["id"] not in history_set:
+                return item
+
+        # If all candidates already in history, try alternative query
+        alt_query = "nhạc trẻ acoustic chill"
+        if query != alt_query:
+            fallback_results = search_youtube(alt_query, limit=limit)
+            for item in fallback_results:
+                if item.get("id") and item["id"] not in history_set:
+                    return item
+
+        return results[0] if results else None
+    except Exception as e:
+        logger.error(f"Error in get_radio_recommendations: {e}")
+        return None
+

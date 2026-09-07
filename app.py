@@ -173,6 +173,21 @@ def api_toggle_fair_play():
     _broadcast_state()
     return jsonify({"success": True, "fair_play_mode": new_val, "state": qm.get_state()})
 
+@app.route("/api/queue/toggle_priority", methods=["POST"])
+def api_queue_toggle_priority():
+    data = request.json or {}
+    uid = data.get("uid")
+    if uid:
+        qm.toggle_priority(uid)
+        _broadcast_state()
+    return jsonify({"success": True, "state": qm.get_state()})
+
+@app.route("/api/queue/toggle_radio", methods=["POST"])
+def api_toggle_radio():
+    new_val = qm.toggle_radio_mode()
+    _broadcast_state()
+    return jsonify({"success": True, "radio_mode": new_val, "state": qm.get_state()})
+
 # ================= API: PLAYBACK CONTROLS =================
 
 @app.route("/api/control/play", methods=["POST"])
@@ -316,12 +331,17 @@ def handle_player_song_ended():
         return
     last_next_time = now
 
-    next_song = qm.next_song()
-    if next_song:
-        emit("player_play_song", {"song": next_song}, broadcast=True)
-    else:
-        emit("player_cmd", {"command": "stop"}, broadcast=True)
-    _broadcast_state()
+    try:
+        next_song = qm.next_song()
+        if next_song:
+            logger.info(f"📻 Auto-playing next song (song ended): {next_song.get('title')} ({next_song.get('id')})")
+            socketio.emit("player_play_song", {"song": next_song})
+        else:
+            logger.info("⏹️ Auto-stopping (song ended, queue empty & radio off)")
+            socketio.emit("player_cmd", {"command": "stop"})
+        _broadcast_state()
+    except Exception as e:
+        logger.error(f"Error in handle_player_song_ended: {e}", exc_info=True)
 
 @socketio.on("player_state_change")
 def handle_player_state_change(data):

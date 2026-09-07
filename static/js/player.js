@@ -9,12 +9,36 @@ let lastEndedEmitTime = 0;
 let isHostNextDebounced = false;
 let progressInterval = null;
 let isVideoMode = true;
+let isPlaybackStopped = false;
+
+function stopPlayback() {
+    isPlaybackStopped = true;
+    currentSong = null;
+    pendingSongToPlay = null;
+    if (player && typeof player.pauseVideo === "function") {
+        try {
+            player.pauseVideo();
+            if (typeof player.seekTo === "function") {
+                player.seekTo(0, true);
+            }
+        } catch (e) {}
+    }
+    stopProgressTracking();
+    updateProgressUI(0, 0);
+    if (elTitle) elTitle.textContent = "Đã dừng phát";
+    if (elArtist) elArtist.textContent = "Hàng đợi đã hết bài";
+    if (elRequesterBadge) elRequesterBadge.classList.add("hidden");
+    updatePlayIcon(false);
+}
 
 const socket = io();
 
 function logToServer(...args) {
     const msg = args.map(a => {
         try {
+            if (a instanceof Error) {
+                return a.stack || a.message || String(a);
+            }
             return typeof a === "object" ? JSON.stringify(a) : String(a);
         } catch (e) {
             return String(a);
@@ -52,6 +76,7 @@ const elIconPlay = document.getElementById("icon-host-play");
 const elHostQueueList = document.getElementById("host-queue-list");
 const elQueueCountBadge = document.getElementById("queue-count-badge");
 const elFairPlayBadge = document.getElementById("fair-play-badge");
+const btnToggleRadio = document.getElementById("btn-toggle-radio");
 const elRequesterBadge = document.getElementById("current-requester-badge");
 const elRequesterIcon = document.getElementById("requester-icon");
 const elRequesterName = document.getElementById("requester-name");
@@ -186,10 +211,13 @@ function onPlayerStateChange(event) {
         stopProgressTracking();
         socket.emit("player_state_change", { state: "paused" });
     } else if (event.data === YT.PlayerState.CUED) {
-        // Video ở trạng thái CUED: video đã sẵn sàng nhưng chưa tự chạy, kích hoạt playVideo()
-        logToServer("Video CUED (đã sẵn sàng), gọi playVideo()");
-        if (player && typeof player.playVideo === "function") {
-            player.playVideo();
+        logToServer("Video CUED (event.data = 5), isPlaybackStopped:", isPlaybackStopped);
+        // CHỈ tự động kích hoạt playVideo nếu KHÔNG PHẢI trạng thái dừng và đang có bài hát hợp lệ
+        if (!isPlaybackStopped && currentSong && currentSong.id) {
+            logToServer("Đang có bài hát hợp lệ, tự động kích hoạt playVideo()");
+            if (player && typeof player.playVideo === "function") {
+                player.playVideo();
+            }
         }
     } else if (event.data === YT.PlayerState.ENDED) {
         // Guard 1: Ignore false ENDED event if the song was loaded less than 5 seconds ago (API transition artifact)
@@ -281,25 +309,39 @@ function formatTime(secs) {
 // Play specific song
 function playSong(song) {
     if (!song || !song.id) return;
+    isPlaybackStopped = false;
+    
+    // Tránh nạp lặp lại cùng 1 bài hát trong thời gian rất ngắn (< 1.5s)
+    if (currentSong && song && (currentSong.uid === song.uid || (currentSong.id === song.id && !song.uid)) && (Date.now() - lastSongLoadTime < 1500)) {
+        logToServer("Bỏ qua playSong trùng lặp trong 1.5s cho:", song.title);
+        return;
+    }
+
     lastSongLoadTime = Date.now();
     currentSong = song;
-    elTitle.textContent = song.title || "Không rõ tiêu đề";
-    elArtist.textContent = song.artist || "YouTube";
+    if (elTitle) elTitle.textContent = song.title || "Không rõ tiêu đề";
+    if (elArtist) elArtist.textContent = song.artist || "YouTube";
     
     if (song.thumbnail) {
-        elAmbientBg.style.backgroundImage = `url('${song.thumbnail}')`;
-        elOverlayArt.src = song.thumbnail;
+        if (elAmbientBg) {
+            elAmbientBg.style.backgroundImage = `url('${song.thumbnail}')`;
+        }
+        if (elOverlayArt) {
+            elOverlayArt.src = song.thumbnail;
+        }
     }
 
     if (song.added_by_name) {
-        elRequesterBadge.classList.remove("hidden");
-        elRequesterBadge.classList.add("flex");
-        elRequesterIcon.textContent = song.added_by_icon || "👤";
-        elRequesterName.textContent = song.added_by_name;
-        elRequesterBadge.style.backgroundColor = `${song.added_by_color || '#ec4899'}33`;
-        elRequesterBadge.style.borderColor = song.added_by_color || '#ec4899';
+        if (elRequesterBadge) {
+            elRequesterBadge.classList.remove("hidden");
+            elRequesterBadge.classList.add("flex");
+            elRequesterBadge.style.backgroundColor = `${song.added_by_color || '#ec4899'}33`;
+            elRequesterBadge.style.borderColor = song.added_by_color || '#ec4899';
+        }
+        if (elRequesterIcon) elRequesterIcon.textContent = song.added_by_icon || "👤";
+        if (elRequesterName) elRequesterName.textContent = song.added_by_name;
     } else {
-        elRequesterBadge.classList.add("hidden");
+        if (elRequesterBadge) elRequesterBadge.classList.add("hidden");
     }
 
     logToServer("▶️ playSong invoked for:", song.title, "ID:", song.id, "UID:", song.uid);
@@ -316,16 +358,33 @@ function playSong(song) {
             if (typeof player.setVolume === "function") {
                 player.setVolume(currentVolume);
             }
+            if (typeof player.playVideo === "function") {
+                player.playVideo();
+            }
         } catch (err) {
             logToServer("Lỗi khi load video bằng object, thử fallback:", err);
             try {
                 player.loadVideoById(song.id, 0);
+                if (typeof player.playVideo === "function") player.playVideo();
             } catch (e2) {
                 logToServer("Lỗi fallback loadVideoById:", e2);
             }
         }
         updatePlayIcon(true);
         pendingSongToPlay = null;
+
+        // Kích hoạt playVideo dự phòng nếu trình duyệt tạm ngừng sau khi nạp video
+        setTimeout(() => {
+            try {
+                if (!isPlaybackStopped && currentSong && player && typeof player.getPlayerState === "function") {
+                    const st = player.getPlayerState();
+                    if (st !== YT.PlayerState.PLAYING && st !== YT.PlayerState.BUFFERING) {
+                        logToServer("Tự động kích hoạt playVideo() dự phòng (state=" + st + ")");
+                        if (typeof player.playVideo === "function") player.playVideo();
+                    }
+                }
+            } catch (e) {}
+        }, 1200);
     } else {
         logToServer("Dàn loa chưa sẵn sàng (isPlayerReady=" + isPlayerReady + "), lưu bài vào pendingSongToPlay:", song.title);
         pendingSongToPlay = song;
@@ -389,11 +448,7 @@ socket.on("player_cmd", (data) => {
     } else if (cmd === "pause") {
         player.pauseVideo();
     } else if (cmd === "stop") {
-        player.stopVideo();
-        elTitle.textContent = "Đã dừng phát";
-        elArtist.textContent = "Hàng đợi đã hết bài";
-        elRequesterBadge.classList.add("hidden");
-        updatePlayIcon(false);
+        stopPlayback();
     } else if (cmd === "set_volume") {
         updateVolumeUI(data.volume, isPlayerReady);
     } else if (cmd === "seek") {
@@ -416,7 +471,21 @@ socket.on("state_update", (state) => {
         elFairPlayBadge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700";
     }
 
-    if (state.current_song) {
+    if (btnToggleRadio) {
+        if (state.radio_mode) {
+            btnToggleRadio.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-pointer transition hover:scale-105 shadow-md shadow-purple-500/10";
+            btnToggleRadio.innerHTML = `<i data-lucide="radio" class="w-3.5 h-3.5 text-purple-400 animate-pulse"></i><span id="radio-mode-text">Radio: BẬT</span>`;
+        } else {
+            btnToggleRadio.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 cursor-pointer transition hover:scale-105";
+            btnToggleRadio.innerHTML = `<i data-lucide="radio" class="w-3.5 h-3.5 text-slate-400"></i><span id="radio-mode-text">Radio: TẮT</span>`;
+        }
+    }
+
+    if (!state.current_song || state.playback_state === "stopped") {
+        if (!isPlaybackStopped) {
+            stopPlayback();
+        }
+    } else if (state.current_song) {
         if (!currentSong || currentSong.uid !== state.current_song.uid) {
             playSong(state.current_song);
         }
@@ -457,18 +526,25 @@ function renderHostQueue(queue) {
     elHostQueueList.innerHTML = queue.map((item, index) => {
         const canMoveUp = index > 0;
         const canMoveDown = index < totalItems - 1;
+        const isPri = !!item.is_priority;
         return `
-        <div class="queue-item flex items-center space-x-2 p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-pink-500/50 transition group shadow-sm select-none"
+        <div class="queue-item flex items-center space-x-2 p-2 rounded-xl transition group select-none ${isPri ? 'bg-amber-950/30 border-2 border-amber-400/80 shadow-lg shadow-amber-500/10' : 'bg-slate-900 border border-slate-700/80 hover:border-pink-500/50 shadow-sm'}"
              draggable="true"
              data-index="${index}"
              data-uid="${item.uid}">
             <div class="drag-handle touch-none p-1 text-slate-400 hover:text-pink-400 cursor-grab active:cursor-grabbing shrink-0 transition" title="Kéo lên/xuống để đổi thứ tự">
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </div>
-            <span class="text-[11px] font-mono font-bold text-pink-400 w-3.5 text-center shrink-0">${index + 1}</span>
-            <img src="${item.thumbnail}" alt="" draggable="false" class="w-9 h-9 rounded-lg object-cover bg-slate-900 shrink-0 pointer-events-none border border-white/10">
+            <span class="text-[11px] font-mono font-bold ${isPri ? 'text-amber-400' : 'text-pink-400'} w-3.5 text-center shrink-0">${index + 1}</span>
+            <div class="relative shrink-0">
+                <img src="${item.thumbnail}" alt="" draggable="false" class="w-9 h-9 rounded-lg object-cover bg-slate-900 pointer-events-none border ${isPri ? 'border-amber-400/50' : 'border-white/10'}">
+                ${isPri ? '<span class="absolute -top-1 -right-1 flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span></span>' : ''}
+            </div>
             <div class="flex-1 min-w-0">
-                <h4 class="text-xs font-bold text-white truncate">${item.title}</h4>
+                <div class="flex items-center space-x-1.5">
+                    <h4 class="text-xs font-bold ${isPri ? 'text-amber-200' : 'text-white'} truncate">${item.title}</h4>
+                    ${isPri ? '<span class="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-amber-500/30 text-amber-300 border border-amber-400/60 animate-pulse">⚡ PHÁT TIẾP</span>' : ''}
+                </div>
                 <div class="flex items-center space-x-2 text-[10px] text-slate-300 mt-0.5">
                     <span class="truncate">${item.artist}</span>
                     <span>•</span>
@@ -481,6 +557,11 @@ function renderHostQueue(queue) {
                 <span>${item.added_by_name}</span>
             </div>
             <div class="flex items-center space-x-0.5 shrink-0">
+                <button onclick="hostTogglePriority('${item.uid}')" 
+                        class="p-1 rounded transition ${isPri ? 'text-amber-300 bg-amber-500/30 border border-amber-400/50 shadow' : 'text-slate-400 hover:text-amber-300 hover:bg-slate-800'}" 
+                        title="${isPri ? 'Hủy ưu tiên phát tiếp' : 'Ưu tiên phát ở bài kế tiếp'}">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 ${isPri ? 'fill-current' : ''}"></i>
+                </button>
                 <button onclick="hostMoveStep(${index}, -1)" 
                         class="p-1 rounded transition ${canMoveUp ? 'text-slate-300 hover:text-pink-400 hover:bg-slate-800' : 'text-slate-600 opacity-40 cursor-not-allowed'}" 
                         ${canMoveUp ? '' : 'disabled'}
@@ -667,10 +748,7 @@ document.getElementById("btn-host-next").addEventListener("click", () => {
                 if (data.current_song) {
                     playSong(data.current_song);
                 } else {
-                    if (player && typeof player.stopVideo === "function") player.stopVideo();
-                    elTitle.textContent = "Đã dừng phát";
-                    elArtist.textContent = "Hàng đợi đã hết bài";
-                    updatePlayIcon(false);
+                    stopPlayback();
                 }
             }
         })
@@ -817,6 +895,19 @@ elFairPlayBadge.addEventListener("click", () => {
         });
 });
 
+// Radio Mode toggle on Host
+if (btnToggleRadio) {
+    btnToggleRadio.addEventListener("click", () => {
+        fetch("/api/queue/toggle_radio", { method: "POST" })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.success) {
+                    showToast(data.radio_mode ? "📻 Đã BẬT Chế độ Radio (Tự động nối bài khi hết queue)!" : "📻 Đã TẮT Chế độ Radio!");
+                }
+            });
+    });
+}
+
 // Clear queue on Host
 const btnHostClearQueue = document.getElementById("btn-host-clear-queue");
 if (btnHostClearQueue) {
@@ -834,6 +925,29 @@ window.hostRemoveFromQueue = function (uid) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid: uid })
     });
+};
+
+// Toggle Priority for a song in Host queue
+window.hostTogglePriority = function (uid) {
+    if (window.roomNet && roomNet.peer && !roomNet.isHost) {
+        roomNet.sendTogglePriority(uid);
+        return;
+    }
+    fetch("/api/queue/toggle_priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: uid })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const target = (data.state && data.state.queue) ? data.state.queue.find(s => s.uid === uid) : null;
+        if (target && target.is_priority) {
+            showToast(`⚡ Đã ưu tiên phát tiếp: ${target.title}`);
+        } else {
+            showToast("Đã hủy ưu tiên phát tiếp");
+        }
+    })
+    .catch(err => logToServer("Error hostTogglePriority:", err));
 };
 
 // ================= HOST MANUAL SEARCH & ADD =================
@@ -1716,3 +1830,340 @@ if (btnAutoCycleBg) {
 const savedBgIdx = parseInt(localStorage.getItem("duojukebox_bg_index") || "0", 10);
 setWallpaper(savedBgIdx, false);
 updateAutoCycleUI();
+
+// ================= CYBERPUNK AUDIO VISUALIZER ENGINE =================
+const elVisualizerWrapper = document.getElementById("visualizer-wrapper");
+const elVisualizerCanvas = document.getElementById("audio-visualizer-canvas");
+const btnToggleVisualizer = document.getElementById("btn-toggle-visualizer");
+const elVisualizerToggleText = document.getElementById("visualizer-toggle-text");
+const btnVisStyleBars = document.getElementById("btn-vis-style-bars");
+const btnVisStyleWave = document.getElementById("btn-vis-style-wave");
+const btnVisMic = document.getElementById("btn-vis-mic");
+const elVisMicText = document.getElementById("vis-mic-text");
+const elVisualizerIndicator = document.getElementById("visualizer-indicator");
+const elVisualizerModeLabel = document.getElementById("visualizer-mode-label");
+const elVinylPulse1 = document.getElementById("vinyl-pulse-ring-1");
+const elVinylPulse2 = document.getElementById("vinyl-pulse-ring-2");
+
+let isVisualizerEnabled = localStorage.getItem("duojukebox_vis_enabled") !== "false";
+let visStyle = localStorage.getItem("duojukebox_vis_style") || "bars"; // 'bars' | 'wave'
+let isMicActive = false;
+let micAudioCtx = null;
+let micAnalyser = null;
+let micStream = null;
+
+const VIS_BAR_COUNT = 36;
+const currentFftData = new Float32Array(VIS_BAR_COUNT);
+const peakCaps = new Float32Array(VIS_BAR_COUNT);
+let visAnimFrameId = null;
+let visTimePhase = 0;
+let smoothedEnergy = 0;
+
+function initAudioVisualizer() {
+    if (!elVisualizerCanvas) return;
+
+    function resizeCanvas() {
+        const rect = elVisualizerCanvas.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+            const dpr = window.devicePixelRatio || 1;
+            elVisualizerCanvas.width = rect.width * dpr;
+            elVisualizerCanvas.height = rect.height * dpr;
+        }
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    // Toggle Visualizer on/off
+    if (btnToggleVisualizer) {
+        btnToggleVisualizer.addEventListener("click", () => {
+            isVisualizerEnabled = !isVisualizerEnabled;
+            localStorage.setItem("duojukebox_vis_enabled", isVisualizerEnabled ? "true" : "false");
+            updateVisualizerVisibility();
+            showToast(isVisualizerEnabled ? "🌊 Đã BẬT Sóng nhạc visualizer!" : "🌊 Đã TẮT Sóng nhạc visualizer");
+        });
+    }
+
+    // Switch style to Bars
+    if (btnVisStyleBars) {
+        btnVisStyleBars.addEventListener("click", () => {
+            setVisualizerStyle("bars");
+        });
+    }
+
+    // Switch style to Wave
+    if (btnVisStyleWave) {
+        btnVisStyleWave.addEventListener("click", () => {
+            setVisualizerStyle("wave");
+        });
+    }
+
+    // Toggle Mic mode
+    if (btnVisMic) {
+        btnVisMic.addEventListener("click", toggleMicMode);
+    }
+
+    updateVisualizerVisibility();
+    updateVisualizerStyleUI();
+    startVisualizerLoop();
+}
+
+function updateVisualizerVisibility() {
+    if (elVisualizerWrapper) {
+        if (isVisualizerEnabled) {
+            elVisualizerWrapper.classList.remove("hidden");
+        } else {
+            elVisualizerWrapper.classList.add("hidden");
+        }
+    }
+    if (btnToggleVisualizer && elVisualizerToggleText) {
+        if (isVisualizerEnabled) {
+            btnToggleVisualizer.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-pink-500/20 text-pink-300 border border-pink-500/30 cursor-pointer transition hover:scale-105 shadow-md shadow-pink-500/10";
+            elVisualizerToggleText.textContent = "Sóng: BẬT";
+        } else {
+            btnToggleVisualizer.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 cursor-pointer transition hover:scale-105";
+            elVisualizerToggleText.textContent = "Sóng: TẮT";
+        }
+    }
+}
+
+function setVisualizerStyle(style) {
+    visStyle = style;
+    localStorage.setItem("duojukebox_vis_style", style);
+    updateVisualizerStyleUI();
+}
+
+function updateVisualizerStyleUI() {
+    if (btnVisStyleBars) {
+        if (visStyle === "bars") {
+            btnVisStyleBars.className = "px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-600/30 text-pink-300 border border-pink-500/40 transition shadow-sm";
+        } else {
+            btnVisStyleBars.className = "px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition";
+        }
+    }
+    if (btnVisStyleWave) {
+        if (visStyle === "wave") {
+            btnVisStyleWave.className = "px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 transition shadow-sm";
+        } else {
+            btnVisStyleWave.className = "px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition";
+        }
+    }
+    if (elVisualizerModeLabel) {
+        elVisualizerModeLabel.textContent = visStyle === "bars" ? "Sóng Nhạc Equalizer" : "Sóng Âm Uốn Lượn (Wave)";
+    }
+}
+
+async function toggleMicMode() {
+    if (isMicActive) {
+        // Turn OFF mic
+        if (micStream) {
+            micStream.getTracks().forEach(t => t.stop());
+            micStream = null;
+        }
+        if (micAudioCtx) {
+            try { await micAudioCtx.close(); } catch(e) {}
+            micAudioCtx = null;
+            micAnalyser = null;
+        }
+        isMicActive = false;
+        if (btnVisMic && elVisMicText) {
+            btnVisMic.className = "flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition";
+            elVisMicText.textContent = "Loa Mic: TẮT";
+        }
+        showToast("🎙️ Đã chuyển về chế độ Nhịp Điệu Tự Động!");
+    } else {
+        // Turn ON mic
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            micAudioCtx = new AudioContextClass();
+            micAnalyser = micAudioCtx.createAnalyser();
+            micAnalyser.fftSize = 128;
+            micAnalyser.smoothingTimeConstant = 0.8;
+            const source = micAudioCtx.createMediaStreamSource(micStream);
+            source.connect(micAnalyser);
+            isMicActive = true;
+            if (btnVisMic && elVisMicText) {
+                btnVisMic.className = "flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 shadow-md shadow-emerald-500/20 transition";
+                elVisMicText.textContent = "Loa Mic: BẬT 🟢";
+            }
+            showToast("🎤 Đã BẬT Bắt nhịp loa phòng khách qua Micro thành công!");
+        } catch (err) {
+            console.error("Mic access error:", err);
+            showToast("Không thể kích hoạt Micro (yêu cầu cấp quyền trong trình duyệt)", "warning");
+        }
+    }
+}
+
+function startVisualizerLoop() {
+    const ctx = elVisualizerCanvas.getContext("2d");
+    const rawMicData = new Uint8Array(64);
+
+    function render() {
+        visAnimFrameId = requestAnimationFrame(render);
+        if (!isVisualizerEnabled || !elVisualizerCanvas) return;
+
+        const width = elVisualizerCanvas.width;
+        const height = elVisualizerCanvas.height;
+        if (width === 0 || height === 0) return;
+
+        visTimePhase += 0.05;
+
+        const isPlaying = !isPlaybackStopped && currentSong && player && typeof player.getPlayerState === "function" && player.getPlayerState() === YT.PlayerState.PLAYING;
+        const targetVolMultiplier = (currentVolume || 80) / 100;
+        const targetEnergy = isPlaying ? (0.85 * targetVolMultiplier) : 0.02;
+        smoothedEnergy += (targetEnergy - smoothedEnergy) * 0.12;
+
+        // Sync indicator in header / card
+        if (elVisualizerIndicator) {
+            if (isPlaying && smoothedEnergy > 0.15) {
+                elVisualizerIndicator.classList.add("active");
+            } else {
+                elVisualizerIndicator.classList.remove("active");
+            }
+        }
+
+        // Sync vinyl aura rings
+        if (elVinylPulse1 && elVinylPulse2) {
+            const playState = (isPlaying && !isVideoMode) ? "running" : "paused";
+            elVinylPulse1.style.animationPlayState = playState;
+            elVinylPulse2.style.animationPlayState = playState;
+        }
+
+        // Compute frequency data
+        if (isMicActive && micAnalyser) {
+            micAnalyser.getByteFrequencyData(rawMicData);
+            for (let i = 0; i < VIS_BAR_COUNT; i++) {
+                const rawVal = rawMicData[Math.floor(i * (rawMicData.length / VIS_BAR_COUNT))] / 255.0;
+                currentFftData[i] += (rawVal - currentFftData[i]) * 0.25;
+            }
+        } else {
+            // Procedural Cyberpunk Rhythm Engine
+            for (let i = 0; i < VIS_BAR_COUNT; i++) {
+                if (isPlaying) {
+                    const normalizedIdx = i / VIS_BAR_COUNT;
+                    // Bass bins (low index) pulse with heavier tempo
+                    const bassPulse = Math.sin(visTimePhase * 3.8) * Math.sin(visTimePhase * 1.9 + 1.0);
+                    const midPulse = Math.cos(visTimePhase * 5.2 + i * 0.35);
+                    const highPulse = Math.sin(visTimePhase * 8.4 + i * 0.7);
+
+                    let barVal = 0.2;
+                    if (normalizedIdx < 0.25) {
+                        barVal = 0.45 + 0.5 * Math.max(0, bassPulse);
+                    } else if (normalizedIdx < 0.65) {
+                        barVal = 0.35 + 0.45 * Math.abs(midPulse);
+                    } else {
+                        barVal = 0.25 + 0.4 * Math.abs(highPulse);
+                    }
+
+                    const targetVal = Math.min(1.0, barVal * smoothedEnergy * (0.8 + 0.4 * Math.sin(visTimePhase * 2.1 + i)));
+                    currentFftData[i] += (targetVal - currentFftData[i]) * 0.3;
+                } else {
+                    currentFftData[i] += (0.02 - currentFftData[i]) * 0.1;
+                }
+            }
+        }
+
+        ctx.clearRect(0, 0, width, height);
+
+        if (visStyle === "bars") {
+            // 📊 1. Cyberpunk Neon Equalizer Bars
+            const barSpacing = Math.max(2, (width / VIS_BAR_COUNT) * 0.25);
+            const barWidth = (width - (VIS_BAR_COUNT - 1) * barSpacing) / VIS_BAR_COUNT;
+            const maxBarHeight = height * 0.88;
+
+            for (let i = 0; i < VIS_BAR_COUNT; i++) {
+                const val = Math.max(0.04, currentFftData[i]);
+                const barHeight = val * maxBarHeight;
+                const x = i * (barWidth + barSpacing);
+                const y = height - barHeight;
+
+                // Update falling peak caps
+                if (barHeight > peakCaps[i]) {
+                    peakCaps[i] = barHeight;
+                } else {
+                    peakCaps[i] = Math.max(0, peakCaps[i] - 1.2);
+                }
+
+                // Vertical Neon Gradient
+                const grad = ctx.createLinearGradient(0, height, 0, y);
+                grad.addColorStop(0, "rgba(6, 182, 212, 0.9)");   // Cyan
+                grad.addColorStop(0.5, "rgba(99, 102, 241, 0.95)"); // Indigo
+                grad.addColorStop(1, "rgba(236, 72, 153, 1.0)");   // Pink Neon
+
+                ctx.save();
+                ctx.shadowColor = "rgba(236, 72, 153, 0.65)";
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = grad;
+
+                // Draw rounded bar
+                const radius = Math.min(barWidth / 2, 4);
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + barWidth - radius, y);
+                ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+                ctx.lineTo(x + barWidth, height);
+                ctx.lineTo(x, height);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw Peak Cap
+                const capY = height - peakCaps[i] - 3;
+                if (capY > 0 && capY < height) {
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                    ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
+                    ctx.shadowBlur = 6;
+                    ctx.fillRect(x, capY, barWidth, 2);
+                }
+                ctx.restore();
+            }
+        } else {
+            // 🌊 2. Fluid Siri / Apple Music Multi-layer Sine Wave
+            const layers = [
+                { color: "rgba(236, 72, 153, 0.45)", stroke: "rgba(236, 72, 153, 0.9)", speed: 1.0, freq: 0.02, ampMult: 1.0 },
+                { color: "rgba(168, 85, 247, 0.35)", stroke: "rgba(168, 85, 247, 0.85)", speed: -1.3, freq: 0.03, ampMult: 0.75 },
+                { color: "rgba(6, 182, 212, 0.3)", stroke: "rgba(6, 182, 212, 0.85)", speed: 1.8, freq: 0.025, ampMult: 0.5 }
+            ];
+
+            const centerY = height * 0.55;
+            const maxAmp = height * 0.42 * smoothedEnergy;
+
+            layers.forEach((layer) => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+
+                for (let x = 0; x <= width; x += 4) {
+                    const normalizedX = x / width;
+                    // Envelope: quiet at borders, maximum amplitude in the center
+                    const envelope = Math.sin(normalizedX * Math.PI);
+                    const binIdx = Math.min(VIS_BAR_COUNT - 1, Math.floor(normalizedX * VIS_BAR_COUNT));
+                    const binBoost = 0.5 + currentFftData[binIdx];
+                    const y = centerY + Math.sin(x * layer.freq + visTimePhase * layer.speed) * maxAmp * layer.ampMult * envelope * binBoost;
+                    ctx.lineTo(x, y);
+                }
+
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                ctx.closePath();
+
+                ctx.fillStyle = layer.color;
+                ctx.shadowColor = layer.stroke;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+
+                // Stroke top line
+                ctx.strokeStyle = layer.stroke;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+    }
+
+    render();
+}
+
+// Start Visualizer Engine
+initAudioVisualizer();

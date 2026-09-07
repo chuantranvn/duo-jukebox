@@ -9,7 +9,11 @@ import os
 import sys
 import time
 import json
+import logging
+import threading
 from tinydb import TinyDB, Query, where
+
+logger = logging.getLogger(__name__)
 
 if getattr(sys, 'frozen', False):
     APP_DIR = os.path.dirname(sys.executable)
@@ -18,6 +22,8 @@ else:
 
 DB_PATH = os.path.join(APP_DIR, "duo_database.json")
 LEGACY_FAV_FILE = os.path.join(APP_DIR, "favorites.json")
+
+_db_lock = threading.RLock()
 
 
 class DuoLocalDB:
@@ -31,6 +37,30 @@ class DuoLocalDB:
         
         # Tự động import dữ liệu từ favorites.json cũ nếu bảng favorites trong TinyDB còn trống
         self._migrate_legacy_favorites()
+
+    def _safe_insert(self, table, doc):
+        """
+        Thực hiện insert an toàn có bảo vệ Lock.
+        Tự động phục hồi nếu _next_id trong bộ nhớ bị lệch so với dữ liệu trên ổ cứng
+        (khắc phục triệt để lỗi 'ValueError: Document with ID ... already exists').
+        """
+        with _db_lock:
+            try:
+                return table.insert(doc)
+            except ValueError as ve:
+                logger.warning(f"[DuoLocalDB] TinyDB ID collision in table '{table.name}': {ve}. Auto-recovering next_id...")
+                try:
+                    table._next_id = None
+                    raw_data = table._read_table()
+                    numeric_ids = [int(k) for k in raw_data.keys() if str(k).isdigit()]
+                    table._next_id = (max(numeric_ids) + 1) if numeric_ids else 1
+                    return table.insert(doc)
+                except Exception as retry_err:
+                    logger.error(f"[DuoLocalDB] TinyDB recovery insert failed: {retry_err}")
+                    return None
+            except Exception as err:
+                logger.error(f"[DuoLocalDB] TinyDB insert error: {err}")
+                return None
 
     def _migrate_legacy_favorites(self):
         try:
@@ -52,7 +82,7 @@ class DuoLocalDB:
                             "url": s.get("url", ""),
                             "added_at": s.get("added_at", int(time.time()))
                         }
-                        self.fav_table.insert(item)
+                        self._safe_insert(self.fav_table, item)
                         migrated_count += 1
                 if migrated_count > 0:
                     print(f"[DuoLocalDB] Migrated {migrated_count} legacy favorites into TinyDB!")
@@ -86,13 +116,14 @@ class DuoLocalDB:
                 "url": song.get("url", ""),
                 "added_at": int(time.time())
             }
-            self.fav_table.insert(doc)
-            return True
+            res = self._safe_insert(self.fav_table, doc)
+            return res is not None
         return False
 
     def remove_favorite(self, user_id: str, song_id: str):
         Item = Query()
-        removed = self.fav_table.remove((Item.user_id == user_id) & (Item.id == song_id))
+        with _db_lock:
+            removed = self.fav_table.remove((Item.user_id == user_id) & (Item.id == song_id))
         return len(removed) > 0
 
     # ================= PLAYBACK HISTORY (LỊCH SỬ PHÁT NHẠC) =================
@@ -100,29 +131,33 @@ class DuoLocalDB:
         """Lưu bài hát vừa phát vào lịch sử NoSQL."""
         if not song or not song.get("id"):
             return
-        doc = {
-            "id": song.get("id"),
-            "uid": song.get("uid", ""),
-            "title": song.get("title", ""),
-            "artist": song.get("artist", ""),
-            "thumbnail": song.get("thumbnail", ""),
-            "duration": song.get("duration", "--:--"),
-            "duration_seconds": song.get("duration_seconds", 0),
-            "url": song.get("url", ""),
-            "added_by": song.get("added_by", ""),
-            "added_by_name": song.get("added_by_name", ""),
-            "added_by_icon": song.get("added_by_icon", "👤"),
-            "played_at": int(time.time())
-        }
-        self.history_table.insert(doc)
+        try:
+            doc = {
+                "id": song.get("id"),
+                "uid": song.get("uid", ""),
+                "title": song.get("title", ""),
+                "artist": song.get("artist", ""),
+                "thumbnail": song.get("thumbnail", ""),
+                "duration": song.get("duration", "--:--"),
+                "duration_seconds": song.get("duration_seconds", 0),
+                "url": song.get("url", ""),
+                "added_by": song.get("added_by", ""),
+                "added_by_name": song.get("added_by_name", ""),
+                "added_by_icon": song.get("added_by_icon", "👤"),
+                "played_at": int(time.time())
+            }
+            self._safe_insert(self.history_table, doc)
 
-        # Giữ tối đa 500 bài trong lịch sử NoSQL để file luôn gọn gàng
-        if len(self.history_table) > 500:
-            all_docs = self.history_table.all()
-            all_docs.sort(key=lambda x: x.get("played_at", 0))
-            excess = len(all_docs) - 500
-            for old_doc in all_docs[:excess]:
-                self.history_table.remove(doc_ids=[old_doc.doc_id])
+            # Giữ tối đa 500 bài trong lịch sử NoSQL để file luôn gọn gàng
+            with _db_lock:
+                if len(self.history_table) > 500:
+                    all_docs = self.history_table.all()
+                    all_docs.sort(key=lambda x: x.get("played_at", 0))
+                    excess = len(all_docs) - 500
+                    for old_doc in all_docs[:excess]:
+                        self.history_table.remove(doc_ids=[old_doc.doc_id])
+        except Exception as e:
+            logger.error(f"[DuoLocalDB] Error adding history: {e}")
 
     def get_history(self, limit: int = 50):
         """Lấy danh sách bài hát đã phát gần đây."""
@@ -154,7 +189,11 @@ class DuoLocalDB:
             "results": results,
             "cached_at": int(time.time())
         }
-        self.cache_table.upsert(doc, Item.query == q)
+        with _db_lock:
+            try:
+                self.cache_table.upsert(doc, Item.query == q)
+            except Exception as e:
+                logger.error(f"[DuoLocalDB] Error saving cache: {e}")
 
     # ================= APP SETTINGS =================
     def get_setting(self, key: str, default=None):
@@ -164,7 +203,11 @@ class DuoLocalDB:
 
     def set_setting(self, key: str, value):
         Item = Query()
-        self.settings_table.upsert({"key": key, "value": value}, Item.key == key)
+        with _db_lock:
+            try:
+                self.settings_table.upsert({"key": key, "value": value}, Item.key == key)
+            except Exception as e:
+                logger.error(f"[DuoLocalDB] Error saving setting: {e}")
 
 
 # Singleton instance

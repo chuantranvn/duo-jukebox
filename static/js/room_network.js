@@ -313,6 +313,12 @@ class RoomNetwork {
                     body: JSON.stringify({ from_index: data.fromIndex, to_index: data.toIndex })
                 });
             }
+        } else if (data.type === 'QUEUE_TOGGLE_PRIORITY') {
+            fetch("/api/queue/toggle_priority", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ uid: data.uid })
+            });
         } else if (data.type === 'CONTROL_CMD') {
             if (this.onHostCommandCallback) {
                 this.onHostCommandCallback(data.command, data.payload);
@@ -662,6 +668,21 @@ class RoomNetwork {
                 type: 'QUEUE_REORDER',
                 fromIndex: fromIndex,
                 toIndex: toIndex
+            });
+        }
+    }
+
+    sendTogglePriority(uid) {
+        if (this.isHost) {
+            fetch("/api/queue/toggle_priority", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ uid: uid })
+            });
+        } else if (this.hostConn && this.hostConn.open) {
+            this.hostConn.send({
+                type: 'QUEUE_TOGGLE_PRIORITY',
+                uid: uid
             });
         }
     }

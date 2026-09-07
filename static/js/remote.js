@@ -23,6 +23,7 @@ const queueList = document.getElementById("queue-list");
 const queueBadgeCount = document.getElementById("queue-badge-count");
 const navQueueBadge = document.getElementById("nav-queue-badge");
 const fairPlayToggle = document.getElementById("fair-play-toggle");
+const radioModeToggle = document.getElementById("radio-mode-toggle");
 const btnClearQueue = document.getElementById("btn-clear-queue");
 
 const favoritesList = document.getElementById("favorites-list");
@@ -204,6 +205,17 @@ function initEventListeners() {
                 showToast(data.fair_play_mode ? "⚖️ Đã BẬT chế độ Xen kẽ (Chồng - Vợ)" : "📑 Đã chuyển về chế độ Tự do (FIFO)");
             });
     });
+
+    // Radio Mode toggle
+    if (radioModeToggle) {
+        radioModeToggle.addEventListener("change", () => {
+            fetch("/api/queue/toggle_radio", { method: "POST" })
+                .then(res => res.json())
+                .then(data => {
+                    showToast(data.radio_mode ? "📻 Đã BẬT Chế độ Radio tự động nối bài" : "📻 Đã TẮT Chế độ Radio");
+                });
+        });
+    }
 
     // Clear queue
     btnClearQueue.addEventListener("click", () => {
@@ -574,8 +586,9 @@ function renderQueue(queue) {
     queueList.innerHTML = queue.map((item, idx) => {
         const canMoveUp = idx > 0;
         const canMoveDown = idx < totalItems - 1;
+        const isPri = !!item.is_priority;
         return `
-        <div class="queue-item flex items-center space-x-2.5 p-3 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-md select-none"
+        <div class="queue-item flex items-center space-x-2.5 p-3 rounded-2xl transition select-none ${isPri ? 'bg-amber-950/30 border-2 border-amber-400/80 shadow-lg shadow-amber-500/10' : 'bg-slate-900 border border-slate-700/80 shadow-md'}"
              draggable="true"
              data-index="${idx}"
              data-uid="${item.uid}">
@@ -585,14 +598,20 @@ function renderQueue(queue) {
             </div>
 
             <!-- Position Index -->
-            <span class="text-xs font-mono font-bold text-pink-400 w-4 text-center shrink-0">${idx + 1}</span>
+            <span class="text-xs font-mono font-bold ${isPri ? 'text-amber-400' : 'text-pink-400'} w-4 text-center shrink-0">${idx + 1}</span>
 
             <!-- Thumbnail -->
-            <img src="${item.thumbnail}" alt="" draggable="false" class="w-12 h-12 rounded-xl object-cover bg-slate-800 shrink-0 pointer-events-none border border-white/10">
+            <div class="relative shrink-0">
+                <img src="${item.thumbnail}" alt="" draggable="false" class="w-12 h-12 rounded-xl object-cover bg-slate-800 pointer-events-none border ${isPri ? 'border-amber-400/50' : 'border-white/10'}">
+                ${isPri ? '<span class="absolute -top-1 -right-1 flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span></span>' : ''}
+            </div>
 
             <!-- Title & Details -->
             <div class="flex-1 min-w-0">
-                <h4 class="text-xs font-bold text-white truncate leading-tight">${item.title}</h4>
+                <div class="flex items-center space-x-1.5">
+                    <h4 class="text-xs font-bold ${isPri ? 'text-amber-200' : 'text-white'} truncate leading-tight">${item.title}</h4>
+                    ${isPri ? '<span class="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-amber-500/30 text-amber-300 border border-amber-400/60 animate-pulse">⚡ PHÁT TIẾP</span>' : ''}
+                </div>
                 <div class="flex items-center space-x-1.5 text-[10px] text-slate-300 mt-1">
                     <span class="truncate">${item.artist}</span>
                     <span>•</span>
@@ -607,8 +626,15 @@ function renderQueue(queue) {
                 </div>
             </div>
 
-            <!-- Action Controls: Up/Down Buttons + Move to Top + Delete -->
+            <!-- Action Controls: Priority + Up/Down Buttons + Move to Top + Delete -->
             <div class="flex items-center space-x-1 shrink-0">
+                <!-- Priority Toggle Button -->
+                <button onclick="handleTogglePriority('${item.uid}')" 
+                        class="p-1.5 rounded-lg transition ${isPri ? 'text-amber-300 bg-amber-500/30 border border-amber-400/50 shadow' : 'text-slate-400 hover:text-amber-300 hover:bg-slate-800'}" 
+                        title="${isPri ? 'Hủy ưu tiên phát tiếp' : 'Ưu tiên phát ở bài kế tiếp'}">
+                    <i data-lucide="zap" class="w-4 h-4 ${isPri ? 'fill-current' : ''}"></i>
+                </button>
+
                 <!-- Move Up Button -->
                 <button onclick="handleMoveStep(${idx}, -1)" 
                         class="p-1.5 rounded-lg transition ${canMoveUp ? 'text-slate-300 hover:text-pink-400 hover:bg-slate-800' : 'text-slate-600 opacity-40 cursor-not-allowed'}" 
@@ -794,6 +820,28 @@ window.handleMoveToTop = function (uid) {
     });
 };
 
+window.handleTogglePriority = function (uid) {
+    if (window.roomNet && roomNet.peer && !roomNet.isHost) {
+        roomNet.sendTogglePriority(uid);
+        return;
+    }
+    fetch("/api/queue/toggle_priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: uid })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const target = (data.state && data.state.queue) ? data.state.queue.find(s => s.uid === uid) : null;
+        if (target && target.is_priority) {
+            showToast(`⚡ Đã ưu tiên phát tiếp: ${target.title}`);
+        } else {
+            showToast("Đã hủy ưu tiên phát tiếp");
+        }
+    })
+    .catch(err => console.error("Error handleTogglePriority:", err));
+};
+
 function updatePlayerConnectionStatus(hasPlayer) {
     const banner = document.getElementById("player-status-banner");
     const icon = document.getElementById("player-status-icon");
@@ -835,6 +883,7 @@ socket.on("state_update", (state) => {
     lastState = state;
     renderQueue(state.queue);
     fairPlayToggle.checked = state.fair_play_mode;
+    if (radioModeToggle) radioModeToggle.checked = !!state.radio_mode;
 
     if (state.has_active_player !== undefined) {
         updatePlayerConnectionStatus(state.has_active_player);
@@ -889,6 +938,10 @@ socket.on("state_update", (state) => {
         const isPlaying = state.playback_state === "playing";
         const btnMini = document.getElementById("btn-mini-play");
         const btnModal = document.getElementById("btn-modal-play");
+        const elMiniWave = document.getElementById("mini-sound-wave");
+        const elModalWave = document.getElementById("modal-sound-wave");
+        const elModalWaveLabel = document.getElementById("modal-sound-wave-label");
+
         if (btnMini) {
             btnMini.innerHTML = `<i data-lucide="${isPlaying ? 'pause' : 'play'}" class="w-6 h-6 fill-current"></i>`;
         }
@@ -897,8 +950,20 @@ socket.on("state_update", (state) => {
         }
         if (isPlaying) {
             miniPlayingIndicator.classList.remove("hidden");
+            if (elMiniWave) {
+                elMiniWave.classList.remove("hidden");
+                elMiniWave.classList.add("active");
+            }
+            if (elModalWave) {
+                elModalWave.classList.remove("hidden");
+                elModalWave.classList.add("active");
+            }
+            if (elModalWaveLabel) elModalWaveLabel.classList.remove("hidden");
         } else {
             miniPlayingIndicator.classList.add("hidden");
+            if (elMiniWave) elMiniWave.classList.remove("active");
+            if (elModalWave) elModalWave.classList.remove("active");
+            if (elModalWaveLabel) elModalWaveLabel.classList.add("hidden");
         }
     } else {
         miniTitle.textContent = "Chưa phát bài nào";
@@ -918,6 +983,13 @@ socket.on("state_update", (state) => {
         if (btnMini) btnMini.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
         if (btnModal) btnModal.innerHTML = `<i data-lucide="play" class="w-8 h-8 fill-current"></i>`;
         miniPlayingIndicator.classList.add("hidden");
+
+        const elMiniWave = document.getElementById("mini-sound-wave");
+        const elModalWave = document.getElementById("modal-sound-wave");
+        const elModalWaveLabel = document.getElementById("modal-sound-wave-label");
+        if (elMiniWave) elMiniWave.classList.add("hidden");
+        if (elModalWave) elModalWave.classList.add("hidden");
+        if (elModalWaveLabel) elModalWaveLabel.classList.add("hidden");
     }
 
     if (state.volume !== undefined && state.volume !== null) {

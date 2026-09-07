@@ -90,6 +90,16 @@
                     <span>Xen kẽ: BẬT</span>
                 </div>
 
+                <div id="btn-toggle-radio" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 cursor-pointer transition hover:scale-105" title="Bấm để bật/tắt chế độ Radio tự động nối bài khi hết queue">
+                    <i data-lucide="radio" class="w-3.5 h-3.5 text-purple-400"></i>
+                    <span id="radio-mode-text">Radio: TẮT</span>
+                </div>
+
+                <div id="btn-toggle-visualizer" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-pink-500/20 text-pink-300 border border-pink-500/30 cursor-pointer transition hover:scale-105" title="Bấm để bật/tắt sóng nhạc nhảy theo điệu">
+                    <i data-lucide="activity" class="w-3.5 h-3.5 text-pink-400"></i>
+                    <span id="visualizer-toggle-text">Sóng: BẬT</span>
+                </div>
+
                 <button id="btn-fullscreen" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Toàn màn hình">
                     <i data-lucide="maximize-2" class="w-4 h-4"></i>
                 </button>
@@ -109,7 +119,7 @@
     <main class="relative z-10 flex-1 grid grid-cols-12 gap-8 p-6 max-w-7xl mx-auto w-full items-start">
         
         <!-- Left 7 Cols: Currently Playing & Visuals -->
-        <div class="col-span-7 flex flex-col items-center justify-center space-y-5 pt-2">
+        <div class="col-span-7 flex flex-col items-center justify-center space-y-4 pt-2">
             
             <!-- Video / Vinyl Switcher Container -->
             <div class="relative w-full aspect-video max-w-xl rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10 group">
@@ -121,8 +131,11 @@
                 <!-- Vinyl & Art Overlay (Can be displayed or toggled) -->
                 <div id="vinyl-overlay" class="absolute inset-0 bg-slate-900/90 flex items-center justify-center hidden backdrop-blur-sm">
                     <div class="relative w-64 h-64 rounded-full bg-slate-950 border-4 border-slate-800 shadow-2xl flex items-center justify-center animate-spin-slow">
-                        <img id="overlay-art" src="" alt="Cover" class="w-32 h-32 rounded-full object-cover border-2 border-white/20 shadow-inner">
-                        <div class="absolute w-6 h-6 rounded-full bg-slate-950 border border-white/40"></div>
+                        <!-- Pulsing Aura Waves in Vinyl Mode -->
+                        <div id="vinyl-pulse-ring-1" class="vinyl-aura-wave"></div>
+                        <div id="vinyl-pulse-ring-2" class="vinyl-aura-wave" style="animation-delay: 1s;"></div>
+                        <img id="overlay-art" src="" alt="Cover" class="w-32 h-32 rounded-full object-cover border-2 border-white/20 shadow-inner z-10">
+                        <div class="absolute w-6 h-6 rounded-full bg-slate-950 border border-white/40 z-10"></div>
                     </div>
                 </div>
 
@@ -136,6 +149,34 @@
                 <button id="btn-toggle-video" class="absolute bottom-3 right-3 z-20 px-3 py-1 rounded-lg text-xs bg-black/60 hover:bg-black/80 text-white/80 backdrop-blur-md border border-white/10 transition">
                     Chế độ Âm nhạc / Video
                 </button>
+            </div>
+
+            <!-- Audio Visualizer Waves Container -->
+            <div id="visualizer-wrapper" class="w-full max-w-xl visualizer-container rounded-2xl bg-slate-900/90 border border-white/10 p-3 backdrop-blur-md transition space-y-2">
+                <div class="flex items-center justify-between px-1 text-[11px] text-slate-300">
+                    <div class="flex items-center space-x-2">
+                        <span class="sound-wave-mini active" id="visualizer-indicator">
+                            <span></span><span></span><span></span><span></span>
+                        </span>
+                        <span class="font-bold text-pink-400 tracking-wide uppercase text-[10px]" id="visualizer-mode-label">Sóng Nhạc Cyberpunk</span>
+                    </div>
+                    <!-- Visualizer Mode Selectors & Mic Button -->
+                    <div class="flex items-center space-x-1.5">
+                        <button id="btn-vis-style-bars" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-600/30 text-pink-300 border border-pink-500/40 hover:bg-pink-600/50 transition" title="Dạng cột Equalizer">
+                            📊 Cột
+                        </button>
+                        <button id="btn-vis-style-wave" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition" title="Dạng sóng uốn lượn">
+                            🌊 Sóng
+                        </button>
+                        <button id="btn-vis-mic" class="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition" title="Bắt nhịp theo tiếng loa ngoài phòng qua Micro">
+                            <i data-lucide="mic" class="w-3 h-3 text-slate-400"></i>
+                            <span id="vis-mic-text">Loa Mic: TẮT</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="relative w-full h-14 rounded-xl overflow-hidden bg-slate-950/60 border border-white/5">
+                    <canvas id="audio-visualizer-canvas" class="w-full h-full"></canvas>
+                </div>
             </div>
 
             <!-- Song Info & Controls Display -->
@@ -500,11 +541,11 @@
 
     <!-- PeerJS for WebRTC P2P Room Networking -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="/static/js/room_network.js?v=4"></script>
+    <script src="/static/js/room_network.js?v=5"></script>
 
     <!-- YouTube IFrame API -->
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/static/js/player.js?v=15"></script>
+    <script src="/static/js/player.js?v=20"></script>
     <script>
         lucide.createIcons();
     </script>

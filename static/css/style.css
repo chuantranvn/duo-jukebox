@@ -115,3 +115,73 @@
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
 }
+
+/* Audio Visualizer Canvas Container */
+.visualizer-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.35));
+}
+
+#audio-visualizer-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Mini Sound Wave Bars for Remote Control & Player badges */
+.sound-wave-mini {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+}
+
+.sound-wave-mini span {
+    width: 3px;
+    height: 4px;
+    background: linear-gradient(to top, #ec4899, #a855f7);
+    border-radius: 9999px;
+    transition: height 0.2s ease;
+}
+
+.sound-wave-mini.active span {
+    animation: wave-bounce 1.2s ease-in-out infinite;
+}
+
+.sound-wave-mini.active span:nth-child(1) { animation-delay: 0.0s; height: 12px; }
+.sound-wave-mini.active span:nth-child(2) { animation-delay: 0.3s; height: 16px; }
+.sound-wave-mini.active span:nth-child(3) { animation-delay: 0.15s; height: 8px; }
+.sound-wave-mini.active span:nth-child(4) { animation-delay: 0.45s; height: 14px; }
+
+@keyframes wave-bounce {
+    0%, 100% {
+        height: 4px;
+    }
+    50% {
+        height: 14px;
+    }
+}
+
+/* Vinyl Aura Waves */
+.vinyl-aura-wave {
+    position: absolute;
+    inset: -20px;
+    border-radius: 9999px;
+    border: 2px solid rgba(236, 72, 153, 0.4);
+    box-shadow: 0 0 25px rgba(236, 72, 153, 0.5), inset 0 0 25px rgba(168, 85, 247, 0.4);
+    animation: vinyl-pulse 2s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes vinyl-pulse {
+    0% {
+        transform: scale(0.95);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1.15);
+        opacity: 0;
+    }
+}
