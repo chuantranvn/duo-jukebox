@@ -1,0 +1,6 @@
+@echo off
+chcp 65001 > nul
+title Đóng gói DuoJukebox.exe
+cd /d "%~dp0"
+python build_exe.py
+pause

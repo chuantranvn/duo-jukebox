@@ -1,0 +1,117 @@
+/* DuoJukebox Custom Styles */
+
+@keyframes spin-slow {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+}
+
+.paused {
+    animation-play-state: paused !important;
+}
+
+/* Custom Sleek Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(236, 72, 153, 0.5);
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Glowing card effects */
+.glow-on-hover:hover {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.25);
+}
+
+/* Toast animation */
+.toast-animate {
+    animation: toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Queue Drag and Drop & Solid Card Styles */
+.queue-item {
+    background-color: #0f172a !important; /* Solid dark Slate-900 */
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.queue-item:hover {
+    border-color: rgba(236, 72, 153, 0.6) !important;
+    background-color: #1e293b !important;
+}
+
+.queue-item.dragging {
+    opacity: 0.5 !important;
+    transform: scale(0.98) !important;
+    border-color: #ec4899 !important;
+    background-color: #1e1b4b !important;
+    box-shadow: 0 0 25px rgba(236, 72, 153, 0.5) !important;
+    pointer-events: none !important; /* Essential for touch document.elementFromPoint */
+}
+
+.queue-item.drag-over {
+    border-color: #ec4899 !important;
+    background-color: rgba(236, 72, 153, 0.25) !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.4) !important;
+}
+
+.drag-handle {
+    touch-action: none;
+}
+
+/* Solid high-contrast backgrounds for search and favorite cards */
+.song-result-card,
+.fav-song-card {
+    background-color: #0f172a !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
