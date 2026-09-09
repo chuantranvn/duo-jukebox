@@ -700,7 +700,7 @@ window.hostMoveStep = function (fromIdx, direction) {
 
 window.hostReorderQueue = function (fromIdx, toIdx) {
     if (fromIdx === toIdx) return;
-    if (window.roomNet && roomNet.peer && !roomNet.isHost) {
+    if (window.roomNet && (roomNet.peer || roomNet.isConnected) && !roomNet.isHost && roomNet.roomCode) {
         roomNet.sendReorderQueue(fromIdx, toIdx);
         showToast("Đã gửi yêu cầu đổi thứ tự bài!");
         return;
@@ -929,7 +929,7 @@ window.hostRemoveFromQueue = function (uid) {
 
 // Toggle Priority for a song in Host queue
 window.hostTogglePriority = function (uid) {
-    if (window.roomNet && roomNet.peer && !roomNet.isHost) {
+    if (window.roomNet && (roomNet.peer || roomNet.isConnected) && !roomNet.isHost && roomNet.roomCode) {
         roomNet.sendTogglePriority(uid);
         return;
     }
@@ -1031,8 +1031,8 @@ window.hostAddToQueue = function (escapedSong, mode) {
         hostUser = window.DuoIdentity.getProfile();
     }
     
-    // Nếu đang ở trong phòng Online với tư cách Khách: gửi qua WebRTC
-    if (window.roomNet && roomNet.peer && !roomNet.isHost) {
+    // Nếu đang ở trong phòng Online với tư cách Khách: gửi qua WebRTC / MQTT
+    if (window.roomNet && (roomNet.peer || roomNet.isConnected) && !roomNet.isHost && roomNet.roomCode) {
         roomNet.sendAddToQueue(song, mode);
         showToast(`${roomNet.user.name} đã gửi bài: ${song.title}`);
         return;
@@ -1315,47 +1315,56 @@ if (btnSubmitCreateRoom) {
 
 // ================= ACTION: JOIN ROOM =================
 function performJoinRoom(code) {
-    const profile = window.DuoIdentity.getProfile();
+    const profile = (window.DuoIdentity && typeof window.DuoIdentity.getProfile === "function") 
+        ? window.DuoIdentity.getProfile() 
+        : { name: "Thành viên", icon: "🎧", color: "#3b82f6" };
     const name = (joinRoomName && joinRoomName.value.trim()) ? joinRoomName.value.trim() : (profile.name || "Thành viên");
     
+    code = (code || (joinRoomCodeInput ? joinRoomCodeInput.value : "") || "").toString().trim();
     if (!code || code.length < 5) {
-        alert("Vui lòng nhập đúng mã phòng gồm 6 số!");
+        showToast("Vui lòng nhập đúng mã phòng gồm 6 số!");
         return;
     }
+
+    const resetJoinButton = () => {
+        if (btnSubmitJoinRoom) {
+            btnSubmitJoinRoom.disabled = false;
+            btnSubmitJoinRoom.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Tham Gia Phòng Ngay</span>`;
+            if (window.lucide) lucide.createIcons();
+        }
+    };
 
     if (btnSubmitJoinRoom) {
         btnSubmitJoinRoom.disabled = true;
         btnSubmitJoinRoom.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang kết nối...</span>`;
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
     }
 
     window.roomNet.joinRoom(code, {
         name: name,
-        icon: selectedJoinAvatar || profile.icon,
-        color: '#3b82f6'
+        icon: selectedJoinAvatar || profile.icon || "🎧",
+        color: profile.color || '#3b82f6'
     }, (connectedCode) => {
-        if (btnSubmitJoinRoom) {
-            btnSubmitJoinRoom.disabled = false;
-            btnSubmitJoinRoom.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Tham Gia Phòng Ngay</span>`;
+        resetJoinButton();
+        if (roomHubModal) {
+            roomHubModal.classList.add("hidden");
+            roomHubModal.classList.remove("flex");
         }
-        roomHubModal.classList.add("hidden");
 
         updateRoomActiveUI(connectedCode);
         showToast(`🟢 Đã tham gia phòng #${connectedCode}! Đang đồng bộ...`);
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
     }, (err) => {
-        if (btnSubmitJoinRoom) {
-            btnSubmitJoinRoom.disabled = false;
-            btnSubmitJoinRoom.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Tham Gia Phòng Ngay</span>`;
-        }
-        alert("Không thể kết nối đến phòng #" + code + ". Vui lòng kiểm tra lại mã phòng!");
-        lucide.createIcons();
+        resetJoinButton();
+        const errMsg = (err && err.message) ? err.message : ("Không thể kết nối đến phòng #" + code + ". Vui lòng kiểm tra lại mã phòng!");
+        showToast(errMsg);
+        if (window.lucide) lucide.createIcons();
     });
 }
 
 if (btnSubmitJoinRoom) {
     btnSubmitJoinRoom.addEventListener("click", () => {
-        const code = joinRoomCodeInput.value.trim();
+        const code = (joinRoomCodeInput ? joinRoomCodeInput.value : "").trim();
         performJoinRoom(code);
     });
 }
@@ -1363,6 +1372,7 @@ if (btnSubmitJoinRoom) {
 // Quick Join from Lobby
 window.quickJoinRoom = function (code) {
     if (joinRoomCodeInput) joinRoomCodeInput.value = code;
+    if (typeof switchRoomHubTab === "function") switchRoomHubTab("join");
     performJoinRoom(code);
 };
 
@@ -1472,7 +1482,13 @@ function escapeHtml(str) {
 }
 
 function appendChatMessage(msg) {
-    if (!chatMessagesContainer) return;
+    if (!chatMessagesContainer || !msg) return;
+
+    const msgId = msg.id || msg.msgId;
+    if (msgId && document.getElementById(`chat-msg-${msgId}`)) {
+        return; // Already rendered in UI
+    }
+
     if (chatMessagesContainer.querySelector(".italic")) {
         chatMessagesContainer.innerHTML = "";
     }
@@ -1482,12 +1498,14 @@ function appendChatMessage(msg) {
 
     if (msg.isSystem) {
         const sysDiv = document.createElement("div");
+        if (msgId) sysDiv.id = `chat-msg-${msgId}`;
         sysDiv.className = "text-center text-[10px] text-pink-300/80 bg-pink-500/10 py-1 px-2.5 rounded-full mx-auto w-fit max-w-[90%]";
         sysDiv.textContent = msg.text;
         chatMessagesContainer.appendChild(sysDiv);
     } else {
         const isMe = (msg.sender && msg.sender.id === window.roomNet.user.id);
         const msgDiv = document.createElement("div");
+        if (msgId) msgDiv.id = `chat-msg-${msgId}`;
         msgDiv.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-0.5`;
         msgDiv.innerHTML = `
             <div class="flex items-center space-x-1 text-[10px] text-slate-400 px-1">

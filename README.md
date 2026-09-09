@@ -69,7 +69,7 @@ Nghe nhạc đồng bộ qua YouTube không giới hạn, công bằng tuyệt �
 - Python 3.10 trở lên (nếu chạy từ source code).
 - Trình duyệt web hiện đại (Google Chrome, Microsoft Edge, Cốc Cốc, Safari...).
 
-### 1. Khởi chạy bằng Python (Khuyên dùng)
+### 1. Khởi chạy bằng Python (Đa nền tảng Windows & Linux)
 ```bash
 # 1. Clone repository về máy
 git clone https://github.com/chuantranvn/duo-jukebox.git
@@ -77,12 +77,18 @@ cd duo-jukebox
 
 # 2. Cài đặt các thư viện cần thiết
 pip install -r requirements.txt
-# (Hoặc: pip install flask flask-socketio qrcode pillow tinydb requests ytmusicapi)
 
 # 3. Khởi chạy máy chủ
 python app.py
 ```
-> **Mẹo trên Windows**: Bạn có thể nhấp đúp trực tiếp vào file **`run.bat`** để khởi động ngay lập tức!
+
+> **🪟 Trên Windows**: 
+> - Nhấp đúp trực tiếp vào file **`DuoJukebox.exe`** để mở ứng dụng Desktop độc lập.
+> - Hoặc nhấp đúp file **`run.bat`** để chạy qua dòng lệnh.
+
+> **🐧 Trên NanoPi M4 / Linux (Ubuntu, Armbian)**:
+> - Cài đặt 1 lệnh tự động: `./setup_nanopi.sh`
+> - Khởi chạy tự động (hỗ trợ cả Headless Terminal không cần màn hình qua Xvfb): `./run_linux.sh`
 
 ### 2. Các địa chỉ truy cập
 Khi máy chủ khởi động, màn hình Console sẽ hiển thị các đường dẫn truy cập:

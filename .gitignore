@@ -16,6 +16,8 @@ dist/
 *.exe
 *.log
 out.txt
+*.zip
+*.rar
 
 # IDE & OS
 .vscode/

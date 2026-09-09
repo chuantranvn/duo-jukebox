@@ -22,6 +22,10 @@ class LocalStore {
                     chats: '++id, roomCode, timestamp, senderId, isSystem',
                     recent_rooms: 'roomCode, lastJoined, hostName'
                 });
+                this.db.version(2).stores({
+                    chats: '++id, msgId, roomCode, timestamp, senderId, isSystem',
+                    recent_rooms: 'roomCode, lastJoined, hostName'
+                });
                 await this.db.open();
                 this.isReady = true;
                 console.log("[LocalStore] IndexedDB (DuoJukeboxDB) initialized successfully via Dexie.js!");
@@ -48,9 +52,10 @@ class LocalStore {
         if (!roomCode || !msg) return;
         await this.ensureReady();
 
+        const msgId = msg.id || msg.msgId || ('msg_' + Date.now());
         const doc = {
             roomCode: roomCode.toString(),
-            msgId: msg.id || ('msg_' + Date.now()),
+            msgId: msgId,
             text: msg.text || '',
             sender: msg.sender || { id: 'unknown', name: 'Ẩn danh', icon: '👤', color: '#94a3b8' },
             senderId: (msg.sender && msg.sender.id) ? msg.sender.id : (msg.senderId || 'unknown'),
@@ -60,6 +65,11 @@ class LocalStore {
 
         if (this.db) {
             try {
+                // Deduplication check in IndexedDB by msgId
+                if (doc.msgId) {
+                    const existing = await this.db.chats.where('msgId').equals(doc.msgId).first();
+                    if (existing) return;
+                }
                 await this.db.chats.add(doc);
             } catch (e) {
                 console.error("[LocalStore] Error saving chat message:", e);
@@ -69,6 +79,7 @@ class LocalStore {
             try {
                 const key = `duo_chat_${roomCode}`;
                 const list = JSON.parse(localStorage.getItem(key) || "[]");
+                if (list.some(c => c.msgId === doc.msgId)) return;
                 list.push(doc);
                 localStorage.setItem(key, JSON.stringify(list));
             } catch (e) {}
@@ -79,13 +90,13 @@ class LocalStore {
         if (!roomCode) return [];
         await this.ensureReady();
 
+        let rawList = [];
         if (this.db) {
             try {
-                const results = await this.db.chats
+                rawList = await this.db.chats
                     .where('roomCode')
                     .equals(roomCode.toString())
                     .sortBy('timestamp');
-                return results.slice(-limit);
             } catch (e) {
                 console.error("[LocalStore] Error fetching chat history:", e);
                 return [];
@@ -94,11 +105,23 @@ class LocalStore {
             // Fallback localStorage
             try {
                 const key = `duo_chat_${roomCode}`;
-                return JSON.parse(localStorage.getItem(key) || "[]").slice(-limit);
+                rawList = JSON.parse(localStorage.getItem(key) || "[]");
             } catch (e) {
                 return [];
             }
         }
+
+        // Deduplicate in case old duplicate entries were previously saved
+        const seenIds = new Set();
+        const deduplicated = [];
+        for (const item of rawList) {
+            const key = item.msgId || (item.text + '_' + item.timestamp);
+            if (!seenIds.has(key)) {
+                seenIds.add(key);
+                deduplicated.push(item);
+            }
+        }
+        return deduplicated.slice(-limit);
     }
 
     async getChatCount(roomCode) {
