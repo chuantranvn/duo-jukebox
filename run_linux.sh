@@ -19,9 +19,11 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 2. Cài đặt thư viện Python nếu chưa có
-echo "[*] Đang kiểm tra thư viện Python (requirements.txt)..."
-python3 -m pip install -r requirements.txt --quiet || pip3 install -r requirements.txt --quiet || true
+# 2. Kiểm tra nhanh thư viện Python (chỉ cài nếu còn thiếu để khởi động siêu tốc)
+if ! python3 -c "import flask, flask_socketio, yt_dlp, tinydb" &>/dev/null; then
+    echo "[*] Phát hiện thiếu thư viện, đang cài đặt..."
+    python3 -m pip install -r requirements.txt --quiet || true
+fi
 
 # 3. Khởi động Flask + SocketIO Backend
 echo "[*] Đang khởi động DuoJukebox Backend tại cổng 5000..."
