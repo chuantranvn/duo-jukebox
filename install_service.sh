@@ -28,8 +28,9 @@ Wants=network-online.target
 Type=simple
 User=$CURRENT_USER
 WorkingDirectory=$DIR
-ExecStartPre=/bin/sleep 3
-ExecStart=$DIR/run_linux.sh
+Environment=PATH=/home/$CURRENT_USER/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash $DIR/run_linux.sh
 Restart=always
 RestartSec=5
 KillMode=mixed
