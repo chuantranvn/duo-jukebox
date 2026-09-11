@@ -1,0 +1,114 @@
+<!-- Room Hub Modal (Tạo / Vào phòng Online) -->
+<div id="room-hub-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xl hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 relative">
+        <button id="btn-close-room-hub" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Modal Header -->
+        <div class="text-center space-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-indigo-600 flex items-center justify-center mx-auto shadow-lg shadow-pink-500/20">
+                <i data-lucide="radio" class="w-6 h-6 text-white"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white">Phòng Nghe Nhạc Online</h3>
+            <p class="text-xs text-slate-400">Nghe chung qua Internet bằng Room Code (Mã phòng 6 số)</p>
+        </div>
+
+        <!-- Mode Tabs: Danh sách phòng Online vs Tạo phòng vs Vào phòng -->
+        <div class="grid grid-cols-3 p-1 bg-slate-950 rounded-2xl border border-white/5">
+            <button id="tab-btn-lobby" class="py-2 rounded-xl text-xs font-bold transition bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow flex items-center justify-center space-x-1">
+                <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+                <span>Phòng Online</span>
+                <span id="active-rooms-badge-count" class="ml-1 px-1.5 py-0.2 bg-pink-500 text-white rounded-full text-[10px]">0</span>
+            </button>
+            <button id="tab-btn-create-room" class="py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white">
+                👑 Tạo Phòng
+            </button>
+            <button id="tab-btn-join-room" class="py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white">
+                🔢 Nhập Mã
+            </button>
+        </div>
+
+        <!-- Section 0: Danh sách phòng Online (Lobby) -->
+        <div id="panel-lobby-rooms" class="space-y-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-400">Các phòng đang phát nhạc:</span>
+                <span class="text-[10px] text-emerald-400 flex items-center space-x-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Trực tiếp (P2P)</span>
+                </span>
+            </div>
+            <div id="lobby-rooms-list" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                <div class="text-center text-slate-500 py-10 text-xs italic">
+                    Đang quét các phòng online...
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 1: Tạo phòng -->
+        <div id="panel-create-room" class="space-y-3.5 hidden">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Mã phòng ngẫu nhiên:</label>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="create-room-code-input" readonly class="w-full text-center font-mono font-bold text-lg tracking-widest py-2 bg-slate-950 border border-pink-500/40 rounded-xl text-pink-400 select-all">
+                    <button id="btn-regen-room-code" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition" title="Đổi mã khác">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tên của bạn:</label>
+                <input type="text" id="create-room-name" value="Chuẩn" placeholder="Nhập tên của bạn..." class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-pink-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Avatar:</label>
+                <div class="flex items-center space-x-2" id="create-avatar-picker">
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-pink-600/30 border border-pink-500 text-base" data-icon="👨">👨</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="👩">👩</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🎉">🎉</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🎸">🎸</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🎧">🎧</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🐱">🐱</button>
+                </div>
+            </div>
+
+            <button id="btn-submit-create-room" class="w-full py-2.5 bg-gradient-to-r from-pink-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 rounded-xl text-xs font-bold text-white shadow-xl shadow-pink-500/25 transition flex items-center justify-center space-x-1.5">
+                <i data-lucide="crown" class="w-4 h-4"></i>
+                <span>Tạo Phòng & Bắt Đầu Nghe</span>
+            </button>
+        </div>
+
+        <!-- Section 2: Vào phòng có sẵn -->
+        <div id="panel-join-room" class="space-y-3.5 hidden">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Nhập mã phòng 6 số:</label>
+                <input type="text" id="join-room-code-input" placeholder="Ví dụ: 849201" maxlength="6" class="w-full text-center font-mono font-bold text-lg tracking-widest py-2 bg-slate-950 border border-slate-700 focus:border-pink-500 focus:outline-none rounded-xl text-white uppercase placeholder-slate-600">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tên của bạn:</label>
+                <input type="text" id="join-room-name" value="Bạn bè" placeholder="Nhập tên hiển thị..." class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-pink-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Avatar:</label>
+                <div class="flex items-center space-x-2" id="join-avatar-picker">
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-pink-600/30 border border-pink-500 text-base" data-icon="👩">👩</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="👨">👨</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🎉">🎉</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🎸">🎸</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🎧">🎧</button>
+                    <button type="button" class="avatar-opt p-1.5 px-2 rounded-xl bg-slate-800 text-base" data-icon="🐱">🐱</button>
+                </div>
+            </div>
+
+            <button id="btn-submit-join-room" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl text-xs font-bold text-white shadow-xl shadow-emerald-500/25 transition flex items-center justify-center space-x-1.5">
+                <i data-lucide="log-in" class="w-4 h-4"></i>
+                <span>Tham Gia Phòng Ngay</span>
+            </button>
+        </div>
+
+    </div>
+</div>

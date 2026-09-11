@@ -130,23 +130,54 @@ Khi máy chủ khởi động, màn hình Console sẽ hiển thị các đườ
 
 ```
 duo-jukebox/
-├── app.py                 # Máy chủ Flask & Socket.IO chính, điều phối playback
+├── app.py                 # Entry point khởi động ứng dụng (slim)
+├── config.py              # Cấu hình IP, Port, Base dir & hằng số hệ thống
 ├── queue_manager.py       # Quản lý hàng đợi, thuật toán Fair-Play, Priority & Radio
 ├── yt_service.py          # Tìm kiếm YouTube & gợi ý bài hát Radio không cần API key
 ├── local_db.py            # Động cơ NoSQL TinyDB thread-safe (Favorites, History, Cache)
+├── sockets.py             # Quản lý toàn bộ WebSocket event handlers (Socket.IO)
+├── routes/                # Module hóa REST API và HTML Page routes
+│   ├── __init__.py        # Đăng ký Blueprints
+│   ├── api.py             # REST API (Search, Queue, Playback control, Favorites)
+│   └── pages.py           # Route phục vụ giao diện (/, /player, /qr, /api/info)
 ├── duo_database.json      # Cơ sở dữ liệu JSON cục bộ lưu trên đĩa
 ├── test_core.py           # Bộ kiểm thử tự động toàn diện (6 test suites)
 ├── run.bat                # Script chạy nhanh trên Windows
 ├── push_to_git.bat        # Script đẩy mã nguồn lên GitHub nhanh
 ├── templates/
-│   ├── player.html        # Giao diện Màn hình TV/PC (Host Player, Visualizer, Wallpaper)
-│   └── index.html         # Giao diện Remote điều khiển trên Điện thoại / Tablet
+│   ├── player.html        # Giao diện Màn hình TV/PC (Host Player)
+│   ├── index.html         # Giao diện Remote điều khiển trên Điện thoại / Tablet
+│   └── partials/          # Jinja2 template partials tái sử dụng
+│       ├── _player_room_hub_modal.html
+│       ├── _player_members_modal.html
+│       ├── _player_chat_drawer.html
+│       ├── _player_nickname_modal.html
+│       ├── _remote_expanded_modal.html
+│       ├── _remote_nav.html
+│       └── _remote_profile_modal.html
 └── static/
     ├── css/
     │   └── style.css      # CSS tùy chỉnh, hoạt ảnh Neon, hiệu ứng đĩa than, Visualizer
     ├── js/
-    │   ├── player.js      # Logic Host Player (YouTube iFrame, Canvas Visualizer 60fps)
-    │   ├── remote.js      # Logic Remote điều khiển điện thoại (Mini player, Sound waves)
+    │   ├── shared/        # Tiện ích và API Client dùng chung
+    │   │   ├── utils.js
+    │   │   └── api-client.js
+    │   ├── player/        # Module chia nhỏ cho Host Player
+    │   │   ├── player-core.js       # YouTube iFrame API & playback
+    │   │   ├── player-controls.js   # Nút điều khiển phát nhạc
+    │   │   ├── player-queue.js      # Danh sách hàng đợi & drag-drop
+    │   │   ├── player-search.js     # Tìm kiếm & thêm bài trên TV
+    │   │   ├── player-room.js       # WebRTC Room Hub kết nối bạn bè
+    │   │   ├── player-chat.js       # Trò chuyện phòng trực tuyến
+    │   │   ├── player-wallpaper.js  # Bộ chuyển đổi hình nền Cyberpunk
+    │   │   ├── player-visualizer.js # Sóng nhạc Equalizer Canvas 60fps
+    │   │   └── player-init.js       # Khởi tạo & gắn kết Socket.IO
+    │   ├── remote/        # Module chia nhỏ cho Remote Điện thoại
+    │   │   ├── remote-core.js       # Socket, Mini player & Modal
+    │   │   ├── remote-search.js     # Tìm kiếm & thêm bài hát
+    │   │   ├── remote-queue.js      # Quản lý hàng đợi từ xa
+    │   │   ├── remote-favorites.js  # Quản lý danh sách bài tủ
+    │   │   └── remote-init.js       # Tab navigation & khởi tạo
     │   ├── room_network.js# Mạng WebRTC P2P Room Hub kết nối bạn bè qua Internet
     │   ├── identity.js    # Quản lý hồ sơ người dùng, nickname và avatar
     │   └── local_store.js # Quản lý NoSQL Dexie IndexedDB trên trình duyệt

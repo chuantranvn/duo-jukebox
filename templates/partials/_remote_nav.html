@@ -1,0 +1,24 @@
+<!-- Bottom Navigation Tabs -->
+<nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 border-t border-white/10 backdrop-blur-xl max-w-lg mx-auto">
+    <div class="grid grid-cols-4 py-2">
+        <button class="nav-tab-btn flex flex-col items-center justify-center text-pink-400 transition" data-tab="tab-search">
+            <i data-lucide="search" class="w-5 h-5"></i>
+            <span class="text-[10px] font-medium mt-1">Tìm bài</span>
+        </button>
+        <button class="nav-tab-btn flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition relative" data-tab="tab-queue">
+            <div class="relative">
+                <i data-lucide="list-music" class="w-5 h-5"></i>
+                <span id="nav-queue-badge" class="absolute -top-1 -right-2 bg-pink-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center hidden">0</span>
+            </div>
+            <span class="text-[10px] font-medium mt-1">Hàng đợi</span>
+        </button>
+        <button class="nav-tab-btn flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition" data-tab="tab-favorites">
+            <i data-lucide="heart" class="w-5 h-5"></i>
+            <span class="text-[10px] font-medium mt-1">Yêu thích</span>
+        </button>
+        <a href="/player" class="flex flex-col items-center justify-center text-indigo-400 hover:text-pink-400 transition" title="Mở Màn hình Loa (Player)">
+            <i data-lucide="tv" class="w-5 h-5"></i>
+            <span class="text-[10px] font-bold mt-1">Màn hình Loa</span>
+        </a>
+    </div>
+</nav>

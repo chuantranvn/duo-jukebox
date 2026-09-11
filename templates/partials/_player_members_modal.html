@@ -1,0 +1,19 @@
+<!-- Members Modal (Danh sách người trong phòng) -->
+<div id="room-members-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/10 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 relative">
+        <button id="btn-close-members-modal" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+        <div class="flex items-center space-x-2">
+            <i data-lucide="users" class="w-5 h-5 text-pink-400"></i>
+            <h3 class="font-bold text-sm text-white">Thành viên trong phòng (<span id="modal-member-count">1</span>)</h3>
+        </div>
+        <div id="room-members-list" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+            <!-- Injected dynamically -->
+        </div>
+        <button id="btn-leave-room" class="w-full py-2 bg-slate-800 hover:bg-red-600/30 hover:text-red-300 text-slate-400 rounded-xl text-xs font-semibold transition flex items-center justify-center space-x-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>Rời khỏi phòng này</span>
+        </button>
+    </div>
+</div>

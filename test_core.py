@@ -159,6 +159,39 @@ def test_radio_mode():
     assert next_s["id"] == "user_song_1", "Bài của người dùng phải được ưu tiên phát trước bài tự động của Radio"
     print("✅ Ưu tiên bài của người dùng trước Radio hoạt động chuẩn xác 100%!")
 
+def test_modular_routes_and_app():
+    print("\n--- 7. Kiểm tra Cấu trúc Modular Routes & App Flask ---")
+    from app import app, PORT, LOCAL_IP
+    assert PORT > 0, "PORT phải là số nguyên hợp lệ"
+    assert LOCAL_IP, "LOCAL_IP không được rỗng"
+
+    client = app.test_client()
+
+    # Trang chủ Remote (index.html với partials)
+    r_index = client.get("/")
+    assert r_index.status_code == 200
+    assert b"DuoJukebox" in r_index.data
+    assert b"expanded-player-modal" in r_index.data, "Partial _remote_expanded_modal phải được include"
+    assert b"nav-tab-btn" in r_index.data, "Partial _remote_nav phải được include"
+
+    # Trang Player TV (player.html với partials)
+    r_player = client.get("/player")
+    assert r_player.status_code == 200
+    assert b"yt-player" in r_player.data
+    assert b"room-hub-modal" in r_player.data, "Partial _player_room_hub_modal phải được include"
+    assert b"chat-drawer" in r_player.data, "Partial _player_chat_drawer phải được include"
+
+    # API Status & Info
+    r_info = client.get("/api/info")
+    assert r_info.status_code == 200
+    assert "remote_url" in r_info.get_json()
+
+    r_status = client.get("/api/status")
+    assert r_status.status_code == 200
+    assert "queue" in r_status.get_json()
+
+    print("✅ Toàn bộ Modular Routes, Blueprints & Templates Partials hoạt động hoàn hảo 100%!")
+
 if __name__ == "__main__":
     test_queue_fair_play()
     test_favorites()
@@ -166,4 +199,5 @@ if __name__ == "__main__":
     test_nosql_storage()
     test_priority_queue_and_stop()
     test_radio_mode()
+    test_modular_routes_and_app()
     print("\n🎉 TẤT CẢ CÁC BÀI TEST ĐÃ VƯỢT QUA THÀNH CÔNG!")

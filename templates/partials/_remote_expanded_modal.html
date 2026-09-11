@@ -1,0 +1,77 @@
+<!-- Expanded Now Playing Modal -->
+<div id="expanded-player-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-2xl flex flex-col justify-between p-6 transition-transform duration-300 translate-y-full">
+    <!-- Modal Top Bar -->
+    <div class="flex items-center justify-between">
+        <button id="btn-close-modal" class="p-2 text-slate-400 hover:text-white rounded-full bg-slate-900 border border-white/10">
+            <i data-lucide="chevron-down" class="w-6 h-6"></i>
+        </button>
+        <div class="text-center">
+            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Đang phát ra loa</p>
+            <div id="modal-requester-badge" class="mt-0.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30 inline-flex items-center space-x-1">
+                <span id="modal-requester-icon">👨</span>
+                <span>Được chọn bởi: <strong id="modal-requester-name">Chồng</strong></span>
+            </div>
+        </div>
+        <a href="/player" class="p-2 text-indigo-400 hover:text-white rounded-full bg-slate-900 border border-white/10 transition" title="Mở Màn hình Loa (Player)">
+            <i data-lucide="tv" class="w-5 h-5"></i>
+        </a>
+    </div>
+
+    <!-- Big Album Artwork -->
+    <div class="flex items-center justify-center my-6">
+        <div class="relative w-64 h-64 rounded-3xl overflow-hidden shadow-2xl border border-white/10 group bg-slate-900 flex items-center justify-center">
+            <div id="modal-thumb-placeholder" class="flex flex-col items-center justify-center text-slate-500 space-y-2">
+                <i data-lucide="disc-3" class="w-20 h-20 text-pink-500/30 animate-spin-slow"></i>
+                <span class="text-xs text-slate-500 font-medium">Chưa phát bài nào</span>
+            </div>
+            <img id="modal-thumb" src="" alt="Album Art" class="w-full h-full object-cover hidden">
+        </div>
+    </div>
+
+    <!-- Song Title & Progress & Controls -->
+    <div class="space-y-6 max-w-sm mx-auto w-full">
+        <div class="text-center">
+            <h3 id="modal-title" class="text-lg font-bold text-white text-center truncate">Tên bài hát</h3>
+            <p id="modal-artist" class="text-xs text-slate-400 text-center truncate mt-1">Ca sĩ / Kênh</p>
+            <div class="flex items-center justify-center space-x-2 mt-2">
+                <span id="modal-sound-wave" class="sound-wave-mini shrink-0 hidden">
+                    <span></span><span></span><span></span><span></span>
+                </span>
+                <span id="modal-sound-wave-label" class="text-[10px] text-pink-400 font-bold uppercase tracking-wider hidden">Đang phát ra loa</span>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="space-y-1">
+            <input type="range" id="modal-seek-bar" min="0" max="100" value="0" class="w-full accent-pink-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg">
+            <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+                <span id="modal-current-time">0:00</span>
+                <span id="modal-duration">0:00</span>
+            </div>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex items-center justify-center space-x-8">
+            <button id="btn-modal-prev" class="p-3 text-slate-400 hover:text-white rounded-full transition hover:scale-110 active:scale-95">
+                <i data-lucide="skip-back" class="w-7 h-7"></i>
+            </button>
+            <button id="btn-modal-play" class="p-5 bg-gradient-to-tr from-pink-600 to-indigo-600 rounded-full text-white shadow-xl shadow-pink-500/30 transition hover:scale-110 active:scale-95">
+                <i data-lucide="play" id="icon-modal-play" class="w-8 h-8 fill-current"></i>
+            </button>
+            <button id="btn-modal-next" class="p-3 text-slate-400 hover:text-white rounded-full transition hover:scale-110 active:scale-95">
+                <i data-lucide="skip-forward" class="w-7 h-7"></i>
+            </button>
+        </div>
+
+        <!-- Volume Slider -->
+        <div class="flex items-center space-x-3 px-4 py-3 bg-slate-900/90 rounded-2xl border border-white/10 shadow-md">
+            <button id="btn-remote-mute" type="button" class="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition focus:outline-none" title="Bấm để Tắt/Bật tiếng (Mute)">
+                <i id="icon-remote-mute" data-lucide="volume-2" class="w-5 h-5 text-pink-400"></i>
+            </button>
+            <input type="range" id="modal-volume" min="0" max="100" value="80" class="w-full accent-pink-500 cursor-pointer h-2 bg-slate-800 rounded-lg">
+            <span id="remote-volume-percent" class="text-xs font-mono font-bold text-slate-300 w-10 text-right">80%</span>
+        </div>
+    </div>
+
+    <div></div>
+</div>
